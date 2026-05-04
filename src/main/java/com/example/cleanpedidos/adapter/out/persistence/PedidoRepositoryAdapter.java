@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 public class PedidoRepositoryAdapter implements PedidoRepositoryPort {
@@ -21,15 +22,14 @@ public class PedidoRepositoryAdapter implements PedidoRepositoryPort {
     }
 
     @Override
-    public Pedido guardar(Pedido pedido) {
+    public void guardar(Pedido pedido) {
         PedidoJpaEntity entity = toEntity(pedido);
-        PedidoJpaEntity saved = jpaRepository.save(entity);
-        return toDomain(saved);
+        jpaRepository.save(entity);
     }
 
     @Override
     public Optional<Pedido> buscarPorId(PedidoId pedidoId) {
-        return jpaRepository.findById(pedidoId.value()).map(this::toDomain);
+        return jpaRepository.findById(pedidoId.valor().toString()).map(this::toDomain);
     }
 
     @Override
@@ -38,38 +38,40 @@ public class PedidoRepositoryAdapter implements PedidoRepositoryPort {
     }
 
     private Pedido toDomain(PedidoJpaEntity entity) {
-        List<LineaPedido> lineas = entity.getLineas().stream()
-                .map(linea -> new LineaPedido(
-                        linea.getReferencia(),
-                        linea.getDescripcion(),
+        PedidoId pedidoId = new PedidoId(UUID.fromString(entity.getId()));
+        Pedido pedido = new Pedido(pedidoId, entity.getClienteNombre());
+
+        entity.getLineas().forEach(linea ->
+                pedido.agregarLinea(
+                        linea.getProductoNombre(),
                         linea.getCantidad(),
-                        Dinero.of(linea.getPrecioUnitario())
-                ))
-                .toList();
-        return new Pedido(
-                entity.getId() == null ? null : PedidoId.of(entity.getId()),
-                entity.getCliente(),
-                lineas,
-                EstadoPedido.valueOf(entity.getEstado())
+                        new Dinero(linea.getPrecioUnitario())
+                )
         );
+
+        if (EstadoPedido.CONFIRMADO.name().equals(entity.getEstado())) {
+            pedido.confirmar();
+        } else if (EstadoPedido.CANCELADO.name().equals(entity.getEstado())) {
+            // Si necesitamos cancelar, aquí iría la lógica, pero por ahora solo soportamos BORRADOR y CONFIRMADO
+            pedido.confirmar(); // Al confirmar se lleva a CONFIRMADO, luego podríamos cancelar si hubiera un método
+        }
+
+        return pedido;
     }
 
     private PedidoJpaEntity toEntity(Pedido pedido) {
-        PedidoJpaEntity entity = new PedidoJpaEntity();
-        if (pedido.getId() != null) {
-            entity.setId(pedido.getId().value());
-        }
-        entity.setCliente(pedido.getCliente());
-        entity.setEstado(pedido.getEstado().name());
-        entity.setTotal(pedido.getTotal().valor());
-        entity.setLineas(pedido.getLineas().stream()
-                .map(linea -> new PedidoJpaEntity.LineaPedidoEmbeddable(
-                        linea.referencia(),
-                        linea.descripcion(),
-                        linea.cantidad(),
-                        linea.precioUnitario().valor()
-                ))
-                .toList());
+        PedidoJpaEntity entity = new PedidoJpaEntity(
+                pedido.getId().valor().toString(),
+                pedido.getClienteNombre(),
+                pedido.getEstado().name(),
+                pedido.getLineas().stream()
+                        .map(linea -> new PedidoJpaEntity.LineaPedidoEmbeddable(
+                                linea.productoNombre(),
+                                linea.cantidad(),
+                                linea.precioUnitario().cantidad()
+                        ))
+                        .toList()
+        );
         return entity;
     }
 }

@@ -9,13 +9,12 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record CrearPedidoRequest(
-        @NotBlank String cliente,
+        @NotBlank String clienteNombre,
         @NotEmpty @Valid List<LineaPedidoRequest> lineas
 ) {
 
     public record LineaPedidoRequest(
-            @NotBlank String referencia,
-            @NotBlank String descripcion,
+            @NotBlank String productoNombre,
             @Positive int cantidad,
             @Positive BigDecimal precioUnitario
     ) {

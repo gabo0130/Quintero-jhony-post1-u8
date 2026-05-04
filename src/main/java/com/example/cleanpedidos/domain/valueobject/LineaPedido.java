@@ -1,23 +1,22 @@
 package com.example.cleanpedidos.domain.valueobject;
 
-import java.util.Objects;
+import java.math.BigDecimal;
 
-public record LineaPedido(String referencia, String descripcion, int cantidad, Dinero precioUnitario) {
+public record LineaPedido(String productoNombre, int cantidad, Dinero precioUnitario) {
 
     public LineaPedido {
-        if (referencia == null || referencia.isBlank()) {
-            throw new IllegalArgumentException("La referencia del producto es obligatoria");
-        }
-        if (descripcion == null || descripcion.isBlank()) {
-            throw new IllegalArgumentException("La descripción del producto es obligatoria");
+        if (productoNombre == null || productoNombre.isBlank()) {
+            throw new IllegalArgumentException("El nombre del producto es obligatorio");
         }
         if (cantidad <= 0) {
-            throw new IllegalArgumentException("La cantidad debe ser mayor que cero");
+            throw new IllegalArgumentException("La cantidad debe ser mayor a cero");
         }
-        precioUnitario = Objects.requireNonNull(precioUnitario, "El precio unitario es obligatorio");
+        if (precioUnitario == null) {
+            throw new IllegalArgumentException("El precio unitario es obligatorio");
+        }
     }
 
     public Dinero subtotal() {
-        return precioUnitario.multiplicar(cantidad);
+        return new Dinero(precioUnitario.cantidad().multiply(BigDecimal.valueOf(cantidad)));
     }
 }

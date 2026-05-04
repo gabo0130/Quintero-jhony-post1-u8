@@ -2,8 +2,10 @@ package com.example.cleanpedidos.usecase.impl;
 
 import com.example.cleanpedidos.domain.entity.Pedido;
 import com.example.cleanpedidos.domain.valueobject.Dinero;
-import com.example.cleanpedidos.domain.valueobject.LineaPedido;
+import com.example.cleanpedidos.domain.valueobject.EstadoPedido;
 import com.example.cleanpedidos.domain.valueobject.PedidoId;
+import com.example.cleanpedidos.usecase.dto.LineaPedidoDto;
+import com.example.cleanpedidos.usecase.dto.PedidoResponse;
 import com.example.cleanpedidos.usecase.port.PedidoRepositoryPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,35 +35,33 @@ class PedidoServiceTest {
 
     @Test
     void debeCrearYConsultarPedido() {
-        Pedido creado = crearPedidoService.crearPedido(Pedido.crearNuevo(
-                "Cliente Uno",
-                List.of(new LineaPedido("SKU-1", "Mouse", 2, Dinero.of(new BigDecimal("50.00"))))
-        ));
+        PedidoId pedidoId = crearPedidoService.ejecutar(
+                "Ana García",
+                List.of(new LineaPedidoDto("Laptop", 1, new BigDecimal("1500.00")))
+        );
 
-        assertEquals(1L, creado.getId().value());
-        assertEquals(new BigDecimal("100.00"), creado.getTotal().valor());
+        assertTrue(pedidoId.valor() instanceof UUID);
 
-        Optional<Pedido> consultado = consultarPedidoService.consultarPedido(PedidoId.of(1L));
+        Optional<PedidoResponse> consultado = consultarPedidoService.buscarPorId(pedidoId);
 
         assertTrue(consultado.isPresent());
-        assertEquals("Cliente Uno", consultado.get().getCliente());
+        assertEquals("Ana García", consultado.get().clienteNombre());
+        assertEquals("CONFIRMADO", consultado.get().estado());
+        assertEquals(new BigDecimal("1500.00"), consultado.get().total());
     }
 
     private static final class InMemoryPedidoRepository implements PedidoRepositoryPort {
 
-        private final Map<Long, Pedido> data = new HashMap<>();
-        private long sequence = 0L;
+        private final Map<UUID, Pedido> data = new HashMap<>();
 
         @Override
-        public Pedido guardar(Pedido pedido) {
-            Pedido toStore = pedido.getId() == null ? pedido.conId(new PedidoId(++sequence)) : pedido;
-            data.put(toStore.getId().value(), toStore);
-            return toStore;
+        public void guardar(Pedido pedido) {
+            data.put(pedido.getId().valor(), pedido);
         }
 
         @Override
         public Optional<Pedido> buscarPorId(PedidoId pedidoId) {
-            return Optional.ofNullable(data.get(pedidoId.value()));
+            return Optional.ofNullable(data.get(pedidoId.valor()));
         }
 
         @Override

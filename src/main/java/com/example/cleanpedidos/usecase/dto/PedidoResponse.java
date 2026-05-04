@@ -1,19 +1,18 @@
-package com.example.cleanpedidos.adapter.in.web.dto;
+package com.example.cleanpedidos.usecase.dto;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 public record PedidoResponse(
-        Long id,
-        String cliente,
+        String id,
+        String clienteNombre,
         String estado,
         BigDecimal total,
         List<LineaPedidoResponse> lineas
 ) {
 
     public record LineaPedidoResponse(
-            String referencia,
-            String descripcion,
+            String productoNombre,
             int cantidad,
             BigDecimal precioUnitario,
             BigDecimal subtotal

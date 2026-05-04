@@ -1,13 +1,11 @@
 package com.example.cleanpedidos.adapter.in.web;
 
 import com.example.cleanpedidos.adapter.in.web.dto.CrearPedidoRequest;
-import com.example.cleanpedidos.adapter.in.web.dto.PedidoResponse;
-import com.example.cleanpedidos.domain.entity.Pedido;
-import com.example.cleanpedidos.domain.valueobject.Dinero;
-import com.example.cleanpedidos.domain.valueobject.LineaPedido;
 import com.example.cleanpedidos.domain.valueobject.PedidoId;
 import com.example.cleanpedidos.usecase.CrearPedidoUseCase;
 import com.example.cleanpedidos.usecase.ConsultarPedidoUseCase;
+import com.example.cleanpedidos.usecase.dto.LineaPedidoDto;
+import com.example.cleanpedidos.usecase.dto.PedidoResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/pedidos")
@@ -33,51 +34,30 @@ public class PedidoController {
         this.consultarPedidoUseCase = consultarPedidoUseCase;
     }
 
-    @GetMapping
-    public List<PedidoResponse> listar() {
-        return consultarPedidoUseCase.listarPedidos().stream().map(this::toResponse).toList();
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, String> crear(@Valid @RequestBody CrearPedidoRequest request) {
+        List<LineaPedidoDto> lineas = request.lineas().stream()
+                .map(linea -> new LineaPedidoDto(
+                        linea.productoNombre(),
+                        linea.cantidad(),
+                        linea.precioUnitario()
+                ))
+                .collect(Collectors.toList());
+
+        PedidoId pedidoId = crearPedidoUseCase.ejecutar(request.clienteNombre(), lineas);
+        return Map.of("pedidoId", pedidoId.toString());
     }
 
     @GetMapping("/{id}")
-    public PedidoResponse buscarPorId(@PathVariable Long id) {
-        Pedido pedido = consultarPedidoUseCase.consultarPedido(PedidoId.of(id))
+    public PedidoResponse buscar(@PathVariable String id) {
+        PedidoId pedidoId = new PedidoId(UUID.fromString(id));
+        return consultarPedidoUseCase.buscarPorId(pedidoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido %s no encontrado".formatted(id)));
-        return toResponse(pedido);
     }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public PedidoResponse crear(@Valid @RequestBody CrearPedidoRequest request) {
-        Pedido pedido = toDomain(request);
-        Pedido guardado = crearPedidoUseCase.crearPedido(pedido);
-        return toResponse(guardado);
-    }
-
-    private Pedido toDomain(CrearPedidoRequest request) {
-        List<LineaPedido> lineas = request.lineas().stream()
-                .map(linea -> new LineaPedido(
-                        linea.referencia(),
-                        linea.descripcion(),
-                        linea.cantidad(),
-                        Dinero.of(linea.precioUnitario())
-                ))
-                .toList();
-        return Pedido.crearNuevo(request.cliente(), lineas);
-    }
-
-    private PedidoResponse toResponse(Pedido pedido) {
-        return new PedidoResponse(
-                pedido.getId() == null ? null : pedido.getId().value(),
-                pedido.getCliente(),
-                pedido.getEstado().name(),
-                pedido.getTotal().valor(),
-                pedido.getLineas().stream().map(linea -> new PedidoResponse.LineaPedidoResponse(
-                        linea.referencia(),
-                        linea.descripcion(),
-                        linea.cantidad(),
-                        linea.precioUnitario().valor(),
-                        linea.subtotal().valor()
-                )).toList()
-        );
+    @GetMapping
+    public List<PedidoResponse> listar() {
+        return consultarPedidoUseCase.listarTodos();
     }
 }
